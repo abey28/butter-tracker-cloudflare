@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧈 25KG奶油業績追蹤系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --primary: #1e40af;
+    --primary-light: #3b82f6;
+    --primary-pale: #dbeafe;
+    --success: #059669;
+    --success-pale: #d1fae5;
+    --warn: #d97706;
+    --warn-pale: #fef3c7;
+    --danger: #dc2626;
+    --danger-pale: #fee2e2;
+    --purple: #7c3aed;
+    --purple-pale: #ede9fe;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  
+  /* Layout */
+  #app { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .header h1 { font-size: 1.25rem; font-weight: 700; }
+  .badge { font-size: 11px; background: var(--primary-pale); color: var(--primary); padding: 2px 8px; border-radius: 20px; }
+  .sync-status { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .sync-status.saving { color: var(--warn); }
+  .sync-status.saved { color: var(--success); }
+
+  /* Identity banner */
+  #identity-bar { background: var(--primary); color: white; padding: 8px 16px; border-radius: var(--radius); margin-bottom: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #identity-bar select { border: none; background: rgba(255,255,255,0.2); color: white; padding: 4px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  #identity-bar option { color: var(--text); background: white; }
+  .identity-label { font-size: 13px; font-weight: 500; }
+
+  /* Tabs */
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; background: white; border-radius: var(--radius); padding: 6px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .tab-btn { padding: 8px 14px; border-radius: 8px; border: none; background: transparent; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .tab-btn:hover { background: var(--bg); color: var(--text); }
+  .tab-btn.active { background: var(--primary); color: white; }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+  .card-grid { display: grid; gap: 16px; }
+  .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .stat-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; border-left: 4px solid var(--primary-light); }
+  .stat-card.green { border-left-color: var(--success); }
+  .stat-card.purple { border-left-color: var(--purple); }
+  .stat-card.orange { border-left-color: var(--warn); }
+  .stat-title { font-size: 12px; color: var(--text-muted); }
+  .stat-value { font-size: 1.8rem; font-weight: 700; margin: 4px 0; }
+  .stat-sub { font-size: 11px; color: var(--text-muted); }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  thead { background: #f8fafc; }
+  th { padding: 10px 12px; text-align: left; font-weight: 600; color: var(--text-muted); white-space: nowrap; font-size: 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+  .td-right { text-align: right; }
+  .td-center { text-align: center; }
+
+  /* Stage badges */
+  .stage-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; color: white; white-space: nowrap; display: inline-block; }
+
+  /* Risk badge */
+  .risk-badge { font-size: 11px; color: var(--danger); }
+
+  /* Filters */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .filter-bar input, .filter-bar select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; background: white; }
+  .filter-count { font-size: 13px; color: var(--text-muted); }
+
+  /* Forms */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+  .form-group input, .form-group select, .form-group textarea { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; background: white; width: 100%; }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+
+  /* Buttons */
+  .btn { border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: #1e3a8a; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover { background: #047857; }
+  .btn-warn { background: var(--warn); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-ghost { background: var(--bg); color: var(--text-muted); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* Progress toggle */
+  .progress-btn { font-size: 12px; padding: 4px 10px; border-radius: 20px; border: none; cursor: pointer; font-weight: 500; transition: all .15s; }
+  .progress-btn.done { background: var(--success-pale); color: var(--success); }
+  .progress-btn.pending { background: #f1f5f9; color: var(--text-muted); }
+
+  /* Progress cards */
+  .progress-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .progress-card .client-info { flex: 1; min-width: 150px; }
+  .progress-card .client-name { font-weight: 600; font-size: 14px; }
+  .progress-card .client-meta { font-size: 11px; color: var(--text-muted); }
+  .progress-card .client-notes { font-size: 11px; color: #94a3b8; margin-top: 2px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .progress-card select { border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+
+  /* Chart container */
+  .chart-wrap { position: relative; height: 260px; }
+
+  /* Ranking */
+  .rank-gold td { background: #fffbeb; }
+  .rank-silver td { background: #f8fafc; }
+  .rank-bronze td { background: #fff7ed; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: white; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 1000; opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Section title */
+  .section-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+
+  /* Risk overview */
+  .risk-box { background: #fef2f2; border-radius: 10px; padding: 12px; text-align: center; }
+  .risk-box .risk-count { font-size: 1.5rem; font-weight: 700; color: var(--danger); }
+  .risk-box .risk-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Space util */
+  .space-y > * + * { margin-top: 12px; }
+  .mt-4 { margin-top: 16px; }
+  .mb-4 { margin-bottom: 16px; }
+
+  /* Comment box */
+  .comment-section { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .comment-item { font-size: 11px; color: var(--text-muted); padding: 2px 0; }
+  .comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
+  .comment-input-row input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+
+  /* Export bar */
+  .export-bar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+
+  /* Note input in progress */
+  .notes-edit { border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; min-width: 160px; }
+
+  /* Loading overlay */
+  #loading { position: fixed; inset: 0; background: rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; font-size: 15px; color: var(--text-muted); gap: 10px; }
+  #loading.hidden { display: none; }
+  .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Mobile adjustments */
+  @media (max-width: 640px) {
+    .tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .tab-btn { font-size: 12px; padding: 6px 10px; }
+    .stat-value { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div> 載入資料中...</div>
+<div id="toast"></div>
+
+<div id="app">
+  <!-- Header -->
+  <div class="header">
+    <span style="font-size:1.8rem">🧈</span>
+    <h1>25KG奶油每週業績追蹤表</h1>
+    <span class="badge">雲端版 v2.0</span>
+    <span class="sync-status" id="sync-status">✓ 已同步</span>
+  </div>
+
+  <!-- Identity bar -->
+  <div id="identity-bar">
+    <span class="identity-label">👤 您的身份：</span>
+    <select id="identity-select" onchange="onIdentityChange()">
+      <option value="">— 請選擇業務員 —</option>
+    </select>
+    <span id="identity-region" style="font-size:12px;opacity:.8;"></span>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white;margin-left:auto;" onclick="exportData()">📤 匯出資料</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white;" onclick="saveAll()">💾 儲存雲端</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- Tab content -->
+  <div id="content"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA CONSTANTS
+// ═══════════════════════════════════════════════════════
+const STAGES = ["開發階段","樣品測試","報價/價格洽談","簽約階段","定期巡補","累計成交"];
+const STAGE_COLORS = {"開發階段":"#94a3b8","樣品測試":"#60a5fa","報價/價格洽談":"#fbbf24","簽約階段":"#f97316","定期巡補":"#a78bfa","累計成交":"#34d399"};
+const RISK_TAGS = ["無","⚠️ 競品低價滲透","⏳ 停滯超過2週","🔻 客戶看跌觀望","❌ 測試不順/風味不符","📋 合約到期風險","🚫 已歇業"];
+const CLIENT_TYPES = ["盤商","工廠","烘焙店","經銷","連鎖","直營","餐飲","個人工作室","門市","烘焙工場"];
+const BRANDS = ["安佳","銀星","德紐","總統","伊斯尼","NZMP","紐麥福","綠牧","德麥","WCBF","WAIU","阿根廷","美國奶油","樂家娜","SAPUTO","ACM","華冠","MG","統一極光","法國AOP","鴻寶","其他"];
+const PRODUCTS = ["OCD有鹽","OCD無鹽","WCBF","WCBF發酵無鹽","Grassland","德紐","紐麥福無鹽","其他"];
+const CONTRACT_TYPES = ["單次","季約","半年約","年約"];
+const WEEKLY_TARGET = 1000;
+const REGIONS = ["北區","中區","南區"];
+const PIE_COLORS = ["#3b82f6","#ef4444","#f59e0b","#10b981","#8b5cf6","#ec4899","#06b6d4","#84cc16","#f43f5e","#0ea5e9"];
+
+const SALES_META = [
+  {name:"林慶宗",region:"南區"},{name:"李穎婷",region:"中區"},
+  {name:"莊智閎",region:"北區"},{name:"張稔圃",region:"北區"},
+  {name:"林宣妤",region:"南區"},{name:"黃昱輝",region:"北區"},
+  {name:"張愛如",region:"中區"},{name:"吳政諺",region:"南區"},
+  {name:"藍采縈",region:"北區"},{name:"何晏丞",region:"北區"},
+  {name:"曾新祐",region:"中區"},{name:"廖士閔",region:"南區"},
+  {name:"黃俊鑫",region:"北區"},{name:"施千惠",region:"中區"},
+];
+const getRegion = n => SALES_META.find(s=>s.name===n)?.region||"";
+
+const INIT_CLIENTS = [
+  {id:1,sales:"何晏丞",client:"嘉元",clientType:"盤商",brand:"安佳",price:null,monthVol:150,planVol:150,stage:"累計成交",risk:"無",notes:"OCD有鹽100+OCD無鹽50，已進貨360箱",progress:true,comments:[]},
+  {id:2,sales:"何晏丞",client:"名佑",clientType:"盤商",brand:"安佳",price:null,monthVol:30,planVol:200,stage:"累計成交",risk:"無",notes:"紐麥福無鹽50+OCD有鹽50+OCD無鹽100，已進貨279箱",progress:true,comments:[]},
+  {id:3,sales:"何晏丞",client:"固的",clientType:"盤商",brand:"WAIU",price:null,monthVol:100,planVol:120,stage:"累計成交",risk:"無",notes:"WAIU/紐西蘭(鴻寶)+WCBF，已進貨OCD有鹽21箱",progress:true,comments:[]},
+  {id:4,sales:"何晏丞",client:"金統",clientType:"盤商",brand:"WAIU",price:null,monthVol:150,planVol:null,stage:"累計成交",risk:"無",notes:"WAIU/紐西蘭+WCBF，已進貨WCBF發酵80+美國無鹽5=85箱",progress:true,comments:[]},
+  {id:5,sales:"何晏丞",client:"大悟",clientType:"盤商",brand:"WCBF",price:null,monthVol:50,planVol:null,stage:"簽約階段",risk:"無",notes:"有意簽約WCBF無鹽600箱",progress:false,comments:[]},
+  {id:6,sales:"何晏丞",client:"源麥",clientType:"盤商",brand:"安佳",price:null,monthVol:100,planVol:null,stage:"開發階段",risk:"🚫 已歇業",notes:"已歇業",progress:false,comments:[]},
+  {id:7,sales:"何晏丞",client:"日月香",clientType:"直營",brand:"綠牧",price:null,monthVol:20,planVol:null,stage:"開發階段",risk:"無",notes:"",progress:false,comments:[]},
+  {id:8,sales:"何晏丞",client:"承繼",clientType:"直營",brand:"法國AOP",price:null,monthVol:15,planVol:null,stage:"開發階段",risk:"無",notes:"月均10-20箱",progress:false,comments:[]},
+  {id:9,sales:"藍采縈",client:"亞尼克",clientType:"工廠",brand:"WCBF",price:5100,monthVol:300,planVol:null,stage:"累計成交",risk:"⚠️ 競品低價滲透",notes:"更換競品美國25kg奶油($5100)，已進貨250箱",progress:true,comments:[]},
+  {id:10,sales:"藍采縈",client:"福利麵包",clientType:"連鎖",brand:"美國奶油",price:5200,monthVol:100,planVol:100,stage:"樣品測試",risk:"無",notes:"2kg樣品需求，提供1箱樣品測試",progress:false,comments:[]},
+  {id:11,sales:"藍采縈",client:"阿默蛋糕",clientType:"連鎖",brand:"安佳",price:null,monthVol:100,planVol:100,stage:"樣品測試",risk:"無",notes:"已測試等檢驗報告走內部流程",progress:true,comments:[]},
+  {id:12,sales:"藍采縈",client:"布列德",clientType:"工廠",brand:"NZMP",price:null,monthVol:250,planVol:null,stage:"報價/價格洽談",risk:"無",notes:"自辦拖櫃，4月底前提供新價",progress:false,comments:[]},
+  {id:13,sales:"藍采縈",client:"哈肯鋪",clientType:"工廠",brand:"NZMP",price:null,monthVol:100,planVol:null,stage:"開發階段",risk:"無",notes:"",progress:false,comments:[]},
+  {id:14,sales:"藍采縈",client:"聖瑪莉",clientType:"工廠",brand:"德麥",price:6600,monthVol:100,planVol:null,stage:"開發階段",risk:"無",notes:"",progress:false,comments:[]},
+  {id:15,sales:"藍采縈",client:"郭元益",clientType:"工廠",brand:"安佳",price:null,monthVol:50,planVol:null,stage:"開發階段",risk:"無",notes:"",progress:false,comments:[]},
+  {id:16,sales:"藍采縈",client:"豪宬",clientType:"連鎖",brand:"綠牧",price:null,monthVol:50,planVol:null,stage:"開發階段",risk:"無",notes:"需要使用歐洲產地，改推燈塔",progress:false,comments:[]},
+  {id:17,sales:"莊智閎",client:"天下",clientType:"工廠",brand:"NZMP",price:null,monthVol:40,planVol:null,stage:"累計成交",risk:"🔻 客戶看跌觀望",notes:"Anchor有鹽片狀+NZMP，已導入OCD無鹽但可能改用人造奶油，已進貨46箱",progress:true,comments:[]},
+  {id:18,sales:"莊智閎",client:"豐稷",clientType:"工廠",brand:"德紐",price:6500,monthVol:50,planVol:null,stage:"樣品測試",risk:"無",notes:"600箱/年，OCD已派樣測試",progress:false,comments:[]},
+  {id:19,sales:"黃昱輝",client:"維喆",clientType:"工廠",brand:"綠牧",price:6250,monthVol:30,planVol:null,stage:"累計成交",risk:"無",notes:"綠牧25kg+OCD，OCD已進貨62箱",progress:true,comments:[]},
+  {id:20,sales:"黃昱輝",client:"禮莊",clientType:"工廠",brand:"安佳",price:7100,monthVol:30,planVol:null,stage:"累計成交",risk:"無",notes:"安佳+金統+OCD，OCD已進貨54箱",progress:true,comments:[]},
+  {id:21,sales:"黃昱輝",client:"脆皮鮮奶甜甜圈",clientType:"烘焙工場",brand:"安佳",price:6200,monthVol:20,planVol:null,stage:"簽約階段",risk:"無",notes:"安佳+WCBF+OCD，OCD合約已簽100箱",progress:true,comments:[]},
+  {id:22,sales:"張稔圃",client:"復興空廚",clientType:"工廠",brand:"NZMP",price:null,monthVol:12,planVol:null,stage:"開發階段",risk:"無",notes:"月均10~15箱",progress:false,comments:[]},
+  {id:23,sales:"張稔圃",client:"杜康館",clientType:"直營",brand:"NZMP",price:null,monthVol:1,planVol:null,stage:"累計成交",risk:"無",notes:"已導入",progress:true,comments:[]},
+  {id:24,sales:"黃俊鑫",client:"萊成",clientType:"盤商",brand:"WAIU",price:6000,monthVol:40,planVol:null,stage:"開發階段",risk:"⚠️ 競品低價滲透",notes:"鷹雄WAIU/紐西蘭+WCBF+鴻寶，進價6000以下，月均30-50箱",progress:false,comments:[]},
+  {id:25,sales:"李穎婷",client:"永明",clientType:"盤商",brand:"華冠",price:5400,monthVol:7,planVol:null,stage:"開發階段",risk:"⚠️ 競品低價滲透",notes:"華冠美國奶油/WCBF，進價5400，月均5-10箱",progress:false,comments:[]},
+  {id:26,sales:"曾新祐",client:"點心魔法師",clientType:"烘焙店",brand:"統一極光",price:null,monthVol:30,planVol:null,stage:"累計成交",risk:"無",notes:"統一極光發酵奶油+MG奶油，已簽約WCBF發酵無鹽($7300)100箱，已出貨50箱",progress:true,comments:[]},
+  {id:27,sales:"張愛如",client:"實心",clientType:"工廠",brand:"樂家娜",price:null,monthVol:5,planVol:null,stage:"開發階段",risk:"⏳ 停滯超過2週",notes:"需等庫存30箱用完才能轉單",progress:false,comments:[]},
+  {id:28,sales:"林慶宗",client:"佳湘",clientType:"工廠",brand:"安佳",price:5800,monthVol:100,planVol:null,stage:"開發階段",risk:"⚠️ 競品低價滲透",notes:"安佳+阿根廷，進價低於5800，月均80-120箱",progress:false,comments:[]},
+  {id:29,sales:"林慶宗",client:"巴特里",clientType:"連鎖",brand:"德紐",price:6200,monthVol:7,planVol:null,stage:"開發階段",risk:"無",notes:"德紐+WCBF，月均5-10箱",progress:false,comments:[]},
+  {id:30,sales:"林慶宗",client:"和美",clientType:"工廠",brand:"阿根廷",price:5800,monthVol:9,planVol:null,stage:"開發階段",risk:"⚠️ 競品低價滲透",notes:"阿根廷，進價5800，月均8-10箱",progress:false,comments:[]},
+  {id:31,sales:"林慶宗",client:"云翔",clientType:"盤商",brand:"阿根廷",price:null,monthVol:15,planVol:null,stage:"開發階段",risk:"無",notes:"月均10-20箱",progress:false,comments:[]},
+  {id:32,sales:"林慶宗",client:"辰果",clientType:"門市",brand:"安佳",price:null,monthVol:2,planVol:null,stage:"開發階段",risk:"無",notes:"安佳+WCBF，月均2-3箱",progress:false,comments:[]},
+  {id:33,sales:"林慶宗",client:"舊振南",clientType:"工廠",brand:"安佳",price:6100,monthVol:6,planVol:null,stage:"開發階段",risk:"無",notes:"進價6100，月均5-8箱",progress:false,comments:[]},
+  {id:34,sales:"林慶宗",client:"森森",clientType:"連鎖",brand:"阿根廷",price:5500,monthVol:15,planVol:null,stage:"開發階段",risk:"⚠️ 競品低價滲透",notes:"阿根廷，進價5字頭，月均10-20箱",progress:false,comments:[]},
+  {id:35,sales:"林慶宗",client:"進益",clientType:"工廠",brand:"紐麥福",price:null,monthVol:null,planVol:null,stage:"開發階段",risk:"無",notes:"",progress:false,comments:[]},
+  {id:36,sales:"吳政諺",client:"河堤",clientType:"個人工作室",brand:"安佳",price:null,monthVol:15,planVol:5,stage:"樣品測試",risk:"❌ 測試不順/風味不符",notes:"測試OPEN反應風味不符",progress:false,comments:[]},
+  {id:37,sales:"吳政諺",client:"一家",clientType:"工廠",brand:"安佳",price:null,monthVol:30,planVol:null,stage:"開發階段",risk:"無",notes:"需紐西蘭片油",progress:false,comments:[]},
+  {id:38,sales:"吳政諺",client:"多麥綠",clientType:"連鎖",brand:"安佳",price:null,monthVol:80,planVol:10,stage:"報價/價格洽談",risk:"🔻 客戶看跌觀望",notes:"暫不更換",progress:false,comments:[]},
+  {id:39,sales:"吳政諺",client:"卓越",clientType:"個人工作室",brand:"安佳",price:null,monthVol:10,planVol:5,stage:"累計成交",risk:"無",notes:"已導入混合使用",progress:true,comments:[]},
+  {id:40,sales:"廖士閔",client:"泓成",clientType:"烘焙店",brand:"安佳",price:7200,monthVol:8,planVol:8,stage:"定期巡補",risk:"無",notes:"成功替代穩定叫貨",progress:true,comments:[]},
+  {id:41,sales:"廖士閔",client:"先生千層",clientType:"烘焙店",brand:"德紐",price:6800,monthVol:5,planVol:null,stage:"開發階段",risk:"無",notes:"",progress:false,comments:[]},
+  {id:42,sales:"林宣妤",client:"明新(OCD)",clientType:"工廠",brand:"WCBF",price:null,monthVol:50,planVol:70,stage:"累計成交",risk:"無",notes:"WCBF/OCD，已進貨70箱",progress:true,comments:[]},
+  {id:43,sales:"林宣妤",client:"明新(WCBF)",clientType:"工廠",brand:"WCBF",price:null,monthVol:30,planVol:50,stage:"累計成交",risk:"無",notes:"已進貨50箱",progress:true,comments:[]},
+  {id:44,sales:"林宣妤",client:"富美",clientType:"經銷",brand:"WCBF",price:null,monthVol:20,planVol:30,stage:"累計成交",risk:"無",notes:"已進貨30箱",progress:true,comments:[]},
+  {id:45,sales:"林宣妤",client:"富樂",clientType:"工廠",brand:"WCBF",price:null,monthVol:20,planVol:20,stage:"累計成交",risk:"無",notes:"已進貨20箱",progress:true,comments:[]},
+  {id:46,sales:"林宣妤",client:"巧婦",clientType:"經銷",brand:"WCBF",price:null,monthVol:null,planVol:null,stage:"累計成交",risk:"無",notes:"已進貨8箱",progress:true,comments:[]},
+  {id:47,sales:"林宣妤",client:"名坂奇",clientType:"工廠",brand:"WCBF",price:null,monthVol:15,planVol:20,stage:"累計成交",risk:"無",notes:"已進貨3箱",progress:true,comments:[]},
+  {id:48,sales:"林宣妤",client:"利承",clientType:"盤商",brand:"紐麥福",price:null,monthVol:10,planVol:15,stage:"累計成交",risk:"無",notes:"OCD/紐麥福，已進貨3箱",progress:true,comments:[]},
+  {id:49,sales:"林宣妤",client:"裕太",clientType:"盤商",brand:"德紐",price:null,monthVol:10,planVol:10,stage:"累計成交",risk:"無",notes:"WCBF/德紐/OCD，已進貨10箱",progress:true,comments:[]},
+  {id:50,sales:"林宣妤",client:"名品",clientType:"盤商",brand:"SAPUTO",price:6500,monthVol:3,planVol:3,stage:"報價/價格洽談",risk:"無",notes:"SAPUTO，進價6500",progress:false,comments:[]},
+  {id:51,sales:"林宣妤",client:"雲林禾豐",clientType:"烘焙店",brand:"ACM",price:null,monthVol:40,planVol:null,stage:"累計成交",risk:"無",notes:"ACM阿根廷，拿紐麥福無鹽先賣看看，已進貨40箱",progress:true,comments:[]},
+  {id:52,sales:"",client:"千巧谷",clientType:"烘焙店",brand:"其他",price:null,monthVol:200,planVol:null,stage:"開發階段",risk:"無",notes:"無擔當者，月均200箱",progress:false,comments:[]},
+  {id:53,sales:"",client:"金品",clientType:"餐飲",brand:"其他",price:null,monthVol:60,planVol:null,stage:"開發階段",risk:"無",notes:"無擔當者，月均60箱",progress:false,comments:[]},
+];
+
+const INIT_DEALS = [
+  {id:1,sales:"何晏丞",client:"嘉元",boxes:126,product:"OCD有鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:2,sales:"何晏丞",client:"嘉元",boxes:234,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:3,sales:"何晏丞",client:"名佑",boxes:100,product:"紐麥福無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:4,sales:"何晏丞",client:"名佑",boxes:43,product:"OCD有鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:5,sales:"何晏丞",client:"名佑",boxes:136,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:6,sales:"何晏丞",client:"固的",boxes:21,product:"OCD有鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:7,sales:"何晏丞",client:"金統",boxes:80,product:"WCBF發酵無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:8,sales:"何晏丞",client:"金統",boxes:5,product:"其他",price:null,contract:"單次",date:"2026/03",notes:"美國無鹽"},
+  {id:9,sales:"藍采縈",client:"亞尼克",boxes:250,product:"其他",price:5100,contract:"單次",date:"2026/03",notes:"更換競品美國25kg"},
+  {id:10,sales:"莊智閎",client:"天下",boxes:46,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:11,sales:"黃昱輝",client:"維喆",boxes:62,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:12,sales:"黃昱輝",client:"禮莊",boxes:54,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:13,sales:"曾新祐",client:"點心魔法師",boxes:50,product:"WCBF發酵無鹽",price:7300,contract:"年約",date:"2026/03",notes:"簽約100箱已出貨50箱"},
+  {id:14,sales:"林宣妤",client:"明新(OCD)",boxes:70,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:15,sales:"林宣妤",client:"明新(WCBF)",boxes:50,product:"WCBF",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:16,sales:"林宣妤",client:"富美",boxes:30,product:"WCBF",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:17,sales:"林宣妤",client:"富樂",boxes:20,product:"WCBF",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:18,sales:"林宣妤",client:"巧婦",boxes:8,product:"WCBF",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:19,sales:"林宣妤",client:"名坂奇",boxes:3,product:"WCBF",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:20,sales:"林宣妤",client:"利承",boxes:3,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:21,sales:"林宣妤",client:"裕太",boxes:10,product:"OCD無鹽",price:null,contract:"單次",date:"2026/03",notes:""},
+  {id:22,sales:"林宣妤",client:"雲林禾豐",boxes:40,product:"紐麥福無鹽",price:null,contract:"單次",date:"2026/03",notes:"紐麥福無鹽先賣看看"},
+];
+
+// ═══════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════
+let clients = JSON.parse(JSON.stringify(INIT_CLIENTS));
+let deals = JSON.parse(JSON.stringify(INIT_DEALS));
+let currentTab = "overview";
+let currentIdentity = "";
+let saveTimer = null;
+let charts = {};
+const fmt = n => n==null ? "-" : Number(n).toLocaleString();
+const fmtN = n => n==null ? "" : String(n);
+const now = () => new Date().toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+const TABS = [
+  {key:"overview",label:"📊 總覽"},
+  {key:"clients",label:"📋 客戶清單"},
+  {key:"deals",label:"💰 成交紀錄"},
+  {key:"update",label:"🔄 進度更新"},
+  {key:"addClient",label:"➕ 新增客戶"},
+  {key:"addDeal",label:"➕ 新增成交"},
+  {key:"ranking",label:"🏆 排行榜"},
+  {key:"trend",label:"📈 趨勢"},
+];
+
+// ═══════════════════════════════════════════════════════
+// CLOUDFLARE KV / STORAGE
+// ═══════════════════════════════════════════════════════
+const API = "/api/data";
+
+async function loadFromCloud() {
+  try {
+    const r = await fetch(API);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    if (data.clients && data.clients.length > 0) {
+      clients = data.clients;
+    }
+    if (data.deals && data.deals.length > 0) {
+      deals = data.deals;
+    }
+    if (data.lastUpdated) {
+      const d = new Date(data.lastUpdated);
+      setSyncStatus("saved","✓ 最後同步：" + d.toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}));
+    }
+    return true;
+  } catch(e) {
+    // Fallback to localStorage
+    const lsClients = localStorage.getItem("butter_clients");
+    const lsDeals = localStorage.getItem("butter_deals");
+    if (lsClients) clients = JSON.parse(lsClients);
+    if (lsDeals) deals = JSON.parse(lsDeals);
+    setSyncStatus("","⚠️ 離線模式（資料儲存於本機）");
+    return false;
+  }
+}
+
+async function saveAll() {
+  setSyncStatus("saving","💾 儲存中...");
+  try {
+    const r = await fetch(API+"?action=saveAll", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({clients,deals})
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    setSyncStatus("saved","✓ 已儲存至雲端 " + now());
+    toast("✅ 資料已儲存至雲端！");
+  } catch(e) {
+    // Fallback to localStorage
+    localStorage.setItem("butter_clients", JSON.stringify(clients));
+    localStorage.setItem("butter_deals", JSON.stringify(deals));
+    setSyncStatus("","💾 已儲存於本機（離線）");
+    toast("⚠️ 雲端儲存失敗，已存於本機");
+  }
+}
+
+function autoSave() {
+  // Save to localStorage immediately as backup
+  localStorage.setItem("butter_clients", JSON.stringify(clients));
+  localStorage.setItem("butter_deals", JSON.stringify(deals));
+  setSyncStatus("saving","● 有未儲存變更");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveAll, 3000); // Auto-save after 3 seconds
+}
+
+function setSyncStatus(cls, text) {
+  const el = document.getElementById("sync-status");
+  el.className = "sync-status " + cls;
+  el.textContent = text;
+}
+
+// ═══════════════════════════════════════════════════════
+// IDENTITY
+// ═══════════════════════════════════════════════════════
+function initIdentity() {
+  const sel = document.getElementById("identity-select");
+  SALES_META.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s.name;
+    o.textContent = s.name + "（" + s.region + "）";
+    sel.appendChild(o);
+  });
+  const saved = localStorage.getItem("butter_identity");
+  if (saved) {
+    sel.value = saved;
+    currentIdentity = saved;
+    document.getElementById("identity-region").textContent = getRegion(saved) ? "[" + getRegion(saved) + "]" : "";
+  }
+}
+
+function onIdentityChange() {
+  const sel = document.getElementById("identity-select");
+  currentIdentity = sel.value;
+  localStorage.setItem("butter_identity", currentIdentity);
+  const region = getRegion(currentIdentity);
+  document.getElementById("identity-region").textContent = region ? "[" + region + "]" : "";
+  // Pre-filter update tab if set identity
+  if (currentTab === "update") renderTab();
+}
+
+// ═══════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+// ═══════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════
+function initTabs() {
+  const container = document.getElementById("tabs");
+  TABS.forEach(t => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (t.key === currentTab ? " active" : "");
+    btn.textContent = t.label;
+    btn.onclick = () => switchTab(t.key);
+    container.appendChild(btn);
+  });
+}
+
+function switchTab(key) {
+  currentTab = key;
+  document.querySelectorAll(".tab-btn").forEach((b,i) => {
+    b.className = "tab-btn" + (TABS[i].key === key ? " active" : "");
+  });
+  // Destroy charts before re-render
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+  renderTab();
+}
+
+// ═══════════════════════════════════════════════════════
+// COMPUTED STATS
+// ═══════════════════════════════════════════════════════
+function getStats() {
+  const totalDealBoxes = deals.reduce((s,d) => s+(d.boxes||0), 0);
+  const closedClients = clients.filter(c => c.stage==="累計成交").length;
+  const totalMonthVol = clients.reduce((s,c) => s+(c.monthVol||0), 0);
+  const totalPlanVol = clients.reduce((s,c) => s+(c.planVol||0), 0);
+  const stageData = STAGES.map(st => ({name:st, value:clients.filter(c=>c.stage===st).length}));
+  const regionData = REGIONS.map(r => {
+    const rc = clients.filter(c=>getRegion(c.sales)===r);
+    return {name:r, clients:rc.length, closed:rc.filter(c=>c.stage==="累計成交").length, boxes:deals.filter(d=>getRegion(d.sales)===r).reduce((s,d)=>s+(d.boxes||0),0)};
+  });
+  const brandCount = {}; clients.forEach(c => {brandCount[c.brand]=(brandCount[c.brand]||0)+1;});
+  const brandData = Object.entries(brandCount).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value}));
+  const typeCount = {}; clients.forEach(c => {typeCount[c.clientType]=(typeCount[c.clientType]||0)+1;});
+  const typeData = Object.entries(typeCount).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value}));
+  const riskCount = {}; clients.forEach(c => {if(c.risk!=="無") riskCount[c.risk]=(riskCount[c.risk]||0)+1;});
+  const riskData = Object.entries(riskCount).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value}));
+  const prodCount = {}; deals.forEach(d => {prodCount[d.product]=(prodCount[d.product]||0)+d.boxes;});
+  const prodData = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).map(([name,value])=>({name,value}));
+  const salesRank = SALES_META.map(s => {
+    const sc = clients.filter(c=>c.sales===s.name);
+    const sd = deals.filter(d=>d.sales===s.name);
+    return {name:s.name,region:s.region,clients:sc.length,closed:sc.filter(c=>c.stage==="累計成交").length,boxes:sd.reduce((sum,d)=>sum+(d.boxes||0),0),monthVol:sc.reduce((sum,c)=>sum+(c.monthVol||0),0)};
+  }).sort((a,b)=>b.boxes-a.boxes);
+  return {totalDealBoxes,closedClients,totalMonthVol,totalPlanVol,stageData,regionData,brandData,typeData,riskData,prodData,salesRank};
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER TABS
+// ═══════════════════════════════════════════════════════
+function renderTab() {
+  const content = document.getElementById("content");
+  const stats = getStats();
+  switch(currentTab) {
+    case "overview": content.innerHTML = renderOverview(stats); initOverviewCharts(stats); break;
+    case "clients":  content.innerHTML = renderClients(); bindClientEvents(); break;
+    case "deals":    content.innerHTML = renderDeals(); bindDealEvents(); break;
+    case "update":   content.innerHTML = renderUpdate(); bindUpdateEvents(); break;
+    case "addClient":content.innerHTML = renderAddClient(); break;
+    case "addDeal":  content.innerHTML = renderAddDeal(); break;
+    case "ranking":  content.innerHTML = renderRanking(stats); initRankingChart(stats); break;
+    case "trend":    content.innerHTML = renderTrend(stats); initTrendCharts(stats); break;
+  }
+}
+
+// ─── Overview ───
+function renderOverview(stats) {
+  return `
+  <div class="card-grid card-grid-4 mb-4">
+    <div class="stat-card"><div class="stat-title">總客戶數</div><div class="stat-value">${clients.length}</div><div class="stat-sub">已成交 ${stats.closedClients} 家</div></div>
+    <div class="stat-card green"><div class="stat-title">累計進貨(箱)</div><div class="stat-value">${fmt(stats.totalDealBoxes)}</div><div class="stat-sub">週目標 ${WEEKLY_TARGET} 箱（${Math.round(stats.totalDealBoxes/WEEKLY_TARGET*100)}%）</div></div>
+    <div class="stat-card purple"><div class="stat-title">客戶月均總量</div><div class="stat-value">${fmt(stats.totalMonthVol)}</div><div class="stat-sub">潛在市場規模</div></div>
+    <div class="stat-card orange"><div class="stat-title">計畫銷售量</div><div class="stat-value">${fmt(stats.totalPlanVol)}</div><div class="stat-sub">3-4月計畫</div></div>
+  </div>
+  <div class="card-grid card-grid-2">
+    <div class="card"><div class="section-title">📊 階段分佈</div><div class="chart-wrap"><canvas id="chart-stage"></canvas></div></div>
+    <div class="card"><div class="section-title">🏢 區域業績(已進貨箱數)</div><div class="chart-wrap"><canvas id="chart-region"></canvas></div></div>
+    <div class="card"><div class="section-title">🏷️ 競品品牌分佈</div><div class="chart-wrap"><canvas id="chart-brand"></canvas></div></div>
+    <div class="card"><div class="section-title">📦 進貨產品分佈(箱)</div><div class="chart-wrap"><canvas id="chart-prod"></canvas></div></div>
+  </div>
+  ${stats.riskData.length > 0 ? `
+  <div class="card mt-4">
+    <div class="section-title">⚠️ 風險客戶一覽</div>
+    <div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      ${stats.riskData.map(r=>`<div class="risk-box"><div class="risk-count">${r.value}</div><div class="risk-label">${r.name}</div></div>`).join("")}
+    </div>
+  </div>` : ""}`;
+}
+
+function initOverviewCharts(stats) {
+  charts.stage = new Chart(document.getElementById("chart-stage"), {
+    type:"bar", data:{
+      labels:stats.stageData.map(d=>d.name),
+      datasets:[{data:stats.stageData.map(d=>d.value),backgroundColor:STAGES.map(s=>STAGE_COLORS[s])}]
+    }, options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{stepSize:1}}}}
+  });
+  charts.region = new Chart(document.getElementById("chart-region"), {
+    type:"bar", data:{
+      labels:stats.regionData.map(d=>d.name),
+      datasets:[{label:"已進貨",data:stats.regionData.map(d=>d.boxes),backgroundColor:"#10b981"},{label:"客戶數",data:stats.regionData.map(d=>d.clients),backgroundColor:"#3b82f6"}]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}
+  });
+  charts.brand = new Chart(document.getElementById("chart-brand"), {
+    type:"doughnut", data:{
+      labels:stats.brandData.slice(0,8).map(d=>d.name),
+      datasets:[{data:stats.brandData.slice(0,8).map(d=>d.value),backgroundColor:PIE_COLORS}]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}
+  });
+  charts.prod = new Chart(document.getElementById("chart-prod"), {
+    type:"doughnut", data:{
+      labels:stats.prodData.map(d=>d.name),
+      datasets:[{data:stats.prodData.map(d=>d.value),backgroundColor:PIE_COLORS}]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}
+  });
+}
+
+// ─── Client List ───
+let clientFilters = {sales:"",region:"",stage:"",type:"",search:""};
+function renderClients() {
+  const fc = clients.filter(c => {
+    if(clientFilters.sales && c.sales!==clientFilters.sales) return false;
+    if(clientFilters.region && getRegion(c.sales)!==clientFilters.region) return false;
+    if(clientFilters.stage && c.stage!==clientFilters.stage) return false;
+    if(clientFilters.type && c.clientType!==clientFilters.type) return false;
+    if(clientFilters.search && !c.client.includes(clientFilters.search) && !c.notes.includes(clientFilters.search)) return false;
+    return true;
+  });
+  return `
+  <div class="filter-bar">
+    <input placeholder="🔍 搜尋客戶/備註" value="${clientFilters.search}" oninput="clientFilters.search=this.value;renderTab()" style="min-width:140px">
+    <select onchange="clientFilters.region=this.value;renderTab()">
+      <option value="">全區域</option>${REGIONS.map(r=>`<option${clientFilters.region===r?" selected":""}>${r}</option>`).join("")}
+    </select>
+    <select onchange="clientFilters.sales=this.value;renderTab()">
+      <option value="">全業務</option>${SALES_META.map(s=>`<option${clientFilters.sales===s.name?" selected":""}>${s.name}</option>`).join("")}
+    </select>
+    <select onchange="clientFilters.stage=this.value;renderTab()">
+      <option value="">全階段</option>${STAGES.map(s=>`<option${clientFilters.stage===s?" selected":""}>${s}</option>`).join("")}
+    </select>
+    <select onchange="clientFilters.type=this.value;renderTab()">
+      <option value="">全類型</option>${CLIENT_TYPES.map(t=>`<option${clientFilters.type===t?" selected":""}>${t}</option>`).join("")}
+    </select>
+    <span class="filter-count">共 ${fc.length} 筆</span>
+  </div>
+  <div class="table-wrap">
+  <table><thead><tr>${["業務","區域","客戶","類型","競品","進價","月均量","計畫量","階段","風險","備註"].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+  <tbody>${fc.map(c=>`<tr>
+    <td>${c.sales||"-"}</td><td>${getRegion(c.sales)||"-"}</td>
+    <td><strong>${c.client}</strong></td><td>${c.clientType}</td><td>${c.brand}</td>
+    <td class="td-right">${c.price?fmt(c.price):"-"}</td>
+    <td class="td-right">${fmt(c.monthVol)}</td><td class="td-right">${fmt(c.planVol)}</td>
+    <td><span class="stage-badge" style="background:${STAGE_COLORS[c.stage]}">${c.stage}</span></td>
+    <td class="risk-badge">${c.risk!=="無"?c.risk:""}</td>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#64748b">${c.notes}</td>
+  </tr>`).join("")}</tbody></table></div>`;
+}
+function bindClientEvents(){}
+
+// ─── Deals ───
+let dealFilterSales = "";
+function renderDeals() {
+  const fd = dealFilterSales ? deals.filter(d=>d.sales===dealFilterSales) : deals;
+  const total = fd.reduce((s,d)=>s+d.boxes,0);
+  return `
+  <div class="filter-bar">
+    <select onchange="dealFilterSales=this.value;renderTab()">
+      <option value="">全業務</option>${SALES_META.map(s=>`<option${dealFilterSales===s.name?" selected":""}>${s.name}</option>`).join("")}
+    </select>
+    <span class="filter-count">共 ${fd.length} 筆，合計 <strong>${fmt(total)}</strong> 箱</span>
+  </div>
+  <div class="table-wrap">
+  <table><thead><tr>${["業務","區域","客戶","箱數","產品","單價","合約","日期","備註",""].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+  <tbody>${fd.map(d=>`<tr>
+    <td>${d.sales}</td><td>${getRegion(d.sales)}</td><td><strong>${d.client}</strong></td>
+    <td class="td-right" style="color:var(--success);font-weight:700">${fmt(d.boxes)}</td>
+    <td>${d.product}</td><td class="td-right">${d.price?fmt(d.price):"-"}</td>
+    <td>${d.contract}</td><td>${d.date}</td>
+    <td style="font-size:12px;color:#64748b">${d.notes}</td>
+    <td><button class="btn btn-sm btn-danger" onclick="deleteDeal(${d.id})">刪除</button></td>
+  </tr>`).join("")}</tbody></table></div>`;
+}
+function deleteDeal(id) {
+  if(!confirm("確定刪除此成交紀錄？")) return;
+  deals = deals.filter(d=>d.id!==id);
+  autoSave(); renderTab(); toast("已刪除成交紀錄");
+}
+function bindDealEvents(){}
+
+// ─── Progress Update ───
+let updateFilter = "";
+function renderUpdate() {
+  // Default to current identity if set
+  const filter = updateFilter || currentIdentity || "";
+  const uf = filter ? clients.filter(c=>c.sales===filter) : clients;
+  return `
+  <div class="filter-bar mb-4">
+    <select onchange="updateFilter=this.value;renderTab()">
+      <option value="">全業務</option>${SALES_META.map(s=>`<option${filter===s.name?" selected":""}>${s.name}</option>`).join("")}
+    </select>
+    <span class="filter-count">共 ${uf.length} 筆</span>
+    ${currentIdentity?`<span style="font-size:12px;color:var(--primary)">📌 已選擇身份：${currentIdentity}（可切換至全業務查看）</span>`:""}
+  </div>
+  <div class="space-y">
+  ${uf.map(c=>`
+    <div class="progress-card" data-id="${c.id}">
+      <div class="client-info">
+        <div class="client-name">${c.client} <span style="font-size:11px;color:#94a3b8">(${c.sales||"未指定"} · ${getRegion(c.sales)||"-"})</span></div>
+        <div class="client-meta">📦 月均 ${fmt(c.monthVol)} 箱 ｜ ${c.clientType} ｜ ${c.brand}</div>
+        <div class="client-notes">📝 ${c.notes||"（無備註）"}</div>
+      </div>
+      <select class="stage-sel" data-id="${c.id}">
+        ${STAGES.map(s=>`<option${c.stage===s?" selected":""}>${s}</option>`).join("")}
+      </select>
+      <select class="risk-sel" data-id="${c.id}" style="font-size:11px">
+        ${RISK_TAGS.map(r=>`<option${c.risk===r?" selected":""}>${r}</option>`).join("")}
+      </select>
+      <button class="progress-btn ${c.progress?"done":"pending"}" data-id="${c.id}">
+        ${c.progress?"✅ 本週有進展":"⬜ 未更新"}
+      </button>
+      <button class="btn btn-sm btn-ghost" onclick="openNoteEdit(${c.id})" title="編輯備註">✏️</button>
+    </div>
+    <div id="note-edit-${c.id}" style="display:none;background:#f8fafc;border-radius:8px;padding:10px;margin-top:-8px;margin-bottom:4px">
+      <label style="font-size:12px;color:#64748b">備註：</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <input class="notes-edit" id="note-input-${c.id}" value="${c.notes||""}" placeholder="輸入備註..." style="flex:1">
+        <button class="btn btn-sm btn-primary" onclick="saveNote(${c.id})">儲存</button>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('note-edit-${c.id}').style.display='none'">取消</button>
+      </div>
+    </div>
+  `).join("")}
+  </div>`;
+}
+
+function openNoteEdit(id) {
+  const el = document.getElementById("note-edit-"+id);
+  el.style.display = el.style.display==="none" ? "block" : "none";
+}
+function saveNote(id) {
+  const val = document.getElementById("note-input-"+id).value;
+  const c = clients.find(c=>c.id===id);
+  if(c){ c.notes = val; autoSave(); toast("備註已儲存"); renderTab(); }
+}
+
+function bindUpdateEvents() {
+  document.querySelectorAll(".stage-sel").forEach(sel => {
+    sel.addEventListener("change", e => {
+      const id = Number(e.target.dataset.id);
+      const c = clients.find(c=>c.id===id);
+      if(c){ c.stage = e.target.value; autoSave(); toast("階段已更新：" + c.client); }
+    });
+  });
+  document.querySelectorAll(".risk-sel").forEach(sel => {
+    sel.addEventListener("change", e => {
+      const id = Number(e.target.dataset.id);
+      const c = clients.find(c=>c.id===id);
+      if(c){ c.risk = e.target.value; autoSave(); toast("風險已更新：" + c.client); }
+    });
+  });
+  document.querySelectorAll(".progress-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const id = Number(e.target.dataset.id);
+      const c = clients.find(c=>c.id===id);
+      if(c){ c.progress = !c.progress; autoSave(); renderTab(); }
+    });
+  });
+}
+
+// ─── Add Client ───
+let newClientForm = {sales:SALES_META[0].name,client:"",clientType:CLIENT_TYPES[0],brand:BRANDS[0],price:"",monthVol:"",planVol:"",stage:STAGES[0],risk:RISK_TAGS[0],notes:""};
+function renderAddClient() {
+  return `
+  <div class="card" style="max-width:700px;margin:0 auto">
+    <div class="section-title">➕ 新增客戶</div>
+    <div class="form-grid">
+      <div class="form-group"><label>業務員</label><select id="nc-sales">
+        ${SALES_META.map(s=>`<option${newClientForm.sales===s.name?" selected":""}>${s.name}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>客戶名稱 *</label><input id="nc-client" value="${newClientForm.client}" placeholder="必填"></div>
+      <div class="form-group"><label>客戶類型</label><select id="nc-type">
+        ${CLIENT_TYPES.map(t=>`<option${newClientForm.clientType===t?" selected":""}>${t}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>目前使用品牌</label><select id="nc-brand">
+        ${BRANDS.map(b=>`<option${newClientForm.brand===b?" selected":""}>${b}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>目前進價</label><input type="number" id="nc-price" value="${newClientForm.price}" placeholder="選填"></div>
+      <div class="form-group"><label>月均量(箱)</label><input type="number" id="nc-mvol" value="${newClientForm.monthVol}" placeholder="選填"></div>
+      <div class="form-group"><label>計畫銷售量(箱)</label><input type="number" id="nc-pvol" value="${newClientForm.planVol}" placeholder="選填"></div>
+      <div class="form-group"><label>階段</label><select id="nc-stage">
+        ${STAGES.map(s=>`<option${newClientForm.stage===s?" selected":""}>${s}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>風險標記</label><select id="nc-risk">
+        ${RISK_TAGS.map(r=>`<option${newClientForm.risk===r?" selected":""}>${r}</option>`).join("")}
+      </select></div>
+      <div class="form-group" style="grid-column:1/-1"><label>備註</label><textarea id="nc-notes">${newClientForm.notes}</textarea></div>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-primary" onclick="submitAddClient()">➕ 新增客戶</button>
+    </div>
+  </div>`;
+}
+function submitAddClient() {
+  const name = document.getElementById("nc-client").value.trim();
+  if(!name){ toast("❌ 請填寫客戶名稱"); return; }
+  const price = document.getElementById("nc-price").value;
+  const mvol = document.getElementById("nc-mvol").value;
+  const pvol = document.getElementById("nc-pvol").value;
+  clients.push({
+    id: Date.now(),
+    sales: document.getElementById("nc-sales").value,
+    client: name,
+    clientType: document.getElementById("nc-type").value,
+    brand: document.getElementById("nc-brand").value,
+    price: price ? Number(price) : null,
+    monthVol: mvol ? Number(mvol) : null,
+    planVol: pvol ? Number(pvol) : null,
+    stage: document.getElementById("nc-stage").value,
+    risk: document.getElementById("nc-risk").value,
+    notes: document.getElementById("nc-notes").value,
+    progress: false, comments: []
+  });
+  newClientForm = {sales:SALES_META[0].name,client:"",clientType:CLIENT_TYPES[0],brand:BRANDS[0],price:"",monthVol:"",planVol:"",stage:STAGES[0],risk:RISK_TAGS[0],notes:""};
+  autoSave(); toast("✅ 客戶已新增！"); renderTab();
+}
+
+// ─── Add Deal ───
+let newDealForm = {sales:SALES_META[0].name,client:"",boxes:"",product:PRODUCTS[0],price:"",contract:CONTRACT_TYPES[0],date:"",notes:""};
+function renderAddDeal() {
+  const today = new Date().toISOString().slice(0,7).replace("-","/");
+  return `
+  <div class="card" style="max-width:700px;margin:0 auto">
+    <div class="section-title">➕ 新增成交紀錄</div>
+    <div class="form-grid">
+      <div class="form-group"><label>業務員</label><select id="nd-sales">
+        ${SALES_META.map(s=>`<option${newDealForm.sales===s.name?" selected":""}>${s.name}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>客戶名稱 *</label>
+        <input id="nd-client" value="${newDealForm.client}" placeholder="必填" list="client-list">
+        <datalist id="client-list">${clients.map(c=>`<option value="${c.client}">`).join("")}</datalist>
+      </div>
+      <div class="form-group"><label>箱數 *</label><input type="number" id="nd-boxes" value="${newDealForm.boxes}" placeholder="必填"></div>
+      <div class="form-group"><label>產品</label><select id="nd-product">
+        ${PRODUCTS.map(p=>`<option${newDealForm.product===p?" selected":""}>${p}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>單價</label><input type="number" id="nd-price" value="${newDealForm.price}" placeholder="選填"></div>
+      <div class="form-group"><label>合約類型</label><select id="nd-contract">
+        ${CONTRACT_TYPES.map(c=>`<option${newDealForm.contract===c?" selected":""}>${c}</option>`).join("")}
+      </select></div>
+      <div class="form-group"><label>日期</label><input id="nd-date" value="${newDealForm.date||today}" placeholder="2026/04/10"></div>
+      <div class="form-group"><label>備註</label><input id="nd-notes" value="${newDealForm.notes}"></div>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-success" onclick="submitAddDeal()">➕ 新增成交</button>
+    </div>
+  </div>`;
+}
+function submitAddDeal() {
+  const client = document.getElementById("nd-client").value.trim();
+  const boxes = document.getElementById("nd-boxes").value;
+  if(!client || !boxes){ toast("❌ 請填寫客戶名稱與箱數"); return; }
+  const price = document.getElementById("nd-price").value;
+  deals.push({
+    id: Date.now(),
+    sales: document.getElementById("nd-sales").value,
+    client, boxes: Number(boxes),
+    product: document.getElementById("nd-product").value,
+    price: price ? Number(price) : null,
+    contract: document.getElementById("nd-contract").value,
+    date: document.getElementById("nd-date").value,
+    notes: document.getElementById("nd-notes").value,
+  });
+  newDealForm = {sales:SALES_META[0].name,client:"",boxes:"",product:PRODUCTS[0],price:"",contract:CONTRACT_TYPES[0],date:"",notes:""};
+  autoSave(); toast("✅ 成交紀錄已新增！"); renderTab();
+}
+
+// ─── Ranking ───
+function renderRanking(stats) {
+  const rankClass = i => i===0?"rank-gold":i===1?"rank-silver":i===2?"rank-bronze":"";
+  const rankIcon = i => i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1;
+  return `
+  <div class="card mb-4">
+    <div class="section-title">🏆 業務員排行榜（依已進貨箱數）</div>
+    <div class="table-wrap"><table><thead><tr>
+      ${["排名","業務員","區域","客戶數","成交數","已進貨(箱)","客戶月均量"].map(h=>`<th>${h}</th>`).join("")}
+    </tr></thead><tbody>
+    ${stats.salesRank.map((s,i)=>`<tr class="${rankClass(i)}">
+      <td class="td-center" style="font-size:1.2rem">${rankIcon(i)}</td>
+      <td><strong>${s.name}</strong></td><td>${s.region}</td>
+      <td class="td-center">${s.clients}</td><td class="td-center">${s.closed}</td>
+      <td class="td-right" style="font-weight:700;color:var(--success)">${fmt(s.boxes)}</td>
+      <td class="td-right">${fmt(s.monthVol)}</td>
+    </tr>`).join("")}
+    </tbody></table></div>
+  </div>
+  <div class="card">
+    <div class="section-title">📊 業務員進貨箱數</div>
+    <div class="chart-wrap" style="height:320px"><canvas id="chart-rank"></canvas></div>
+  </div>`;
+}
+function initRankingChart(stats) {
+  const data = stats.salesRank.filter(s=>s.boxes>0);
+  charts.rank = new Chart(document.getElementById("chart-rank"), {
+    type:"bar", data:{
+      labels:data.map(s=>s.name),
+      datasets:[{label:"已進貨(箱)",data:data.map(s=>s.boxes),backgroundColor:PIE_COLORS}]
+    }, options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
+  });
+}
+
+// ─── Trend ───
+function renderTrend(stats) {
+  return `
+  <div class="card-grid card-grid-2">
+    <div class="card"><div class="section-title">🏢 客戶類型分佈</div><div class="chart-wrap"><canvas id="chart-type"></canvas></div></div>
+    <div class="card"><div class="section-title">🏷️ 競品品牌市佔(客戶數)</div><div class="chart-wrap"><canvas id="chart-brand2"></canvas></div></div>
+    <div class="card"><div class="section-title">📊 各區域階段分佈</div><div class="chart-wrap"><canvas id="chart-region2"></canvas></div></div>
+    <div class="card"><div class="section-title">💰 各業務進貨產品明細</div><div class="chart-wrap"><canvas id="chart-prod2"></canvas></div></div>
+  </div>`;
+}
+function initTrendCharts(stats) {
+  charts.type = new Chart(document.getElementById("chart-type"),{
+    type:"pie",data:{labels:stats.typeData.map(d=>d.name),datasets:[{data:stats.typeData.map(d=>d.value),backgroundColor:PIE_COLORS}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}
+  });
+  charts.brand2 = new Chart(document.getElementById("chart-brand2"),{
+    type:"bar",data:{labels:stats.brandData.map(d=>d.name),datasets:[{label:"客戶數",data:stats.brandData.map(d=>d.value),backgroundColor:"#8b5cf6"}]},
+    options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
+  });
+  // Region-stage stacked
+  const regionStage = REGIONS.map(r=>{
+    const rc = clients.filter(c=>getRegion(c.sales)===r);
+    const obj={name:r};
+    STAGES.forEach(st=>{obj[st]=rc.filter(c=>c.stage===st).length;});
+    return obj;
+  });
+  charts.region2 = new Chart(document.getElementById("chart-region2"),{
+    type:"bar",
+    data:{labels:REGIONS,datasets:STAGES.map((st,i)=>({label:st,data:regionStage.map(r=>r[st]),backgroundColor:STAGE_COLORS[st],stack:"a"}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}}
+  });
+  // Sales-product stacked
+  const sp = SALES_META.map(s=>{
+    const sd = deals.filter(d=>d.sales===s.name);
+    const obj={name:s.name};
+    PRODUCTS.forEach(p=>{obj[p]=sd.filter(d=>d.product===p).reduce((sum,d)=>sum+d.boxes,0);});
+    return obj;
+  }).filter(d=>PRODUCTS.some(p=>d[p]>0));
+  charts.prod2 = new Chart(document.getElementById("chart-prod2"),{
+    type:"bar",
+    data:{labels:sp.map(d=>d.name),datasets:PRODUCTS.map((p,i)=>({label:p,data:sp.map(d=>d[p]),backgroundColor:PIE_COLORS[i%PIE_COLORS.length],stack:"a"}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:10}}}}}
+  });
+}
+
+// ─── Export ───
+function exportData() {
+  const data = {exportTime:new Date().toISOString(),clients,deals};
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "butter-tracker-" + new Date().toISOString().slice(0,10) + ".json";
+  a.click();
+  toast("📤 資料已匯出！");
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+async function init() {
+  document.getElementById("loading").classList.remove("hidden");
+  initTabs();
+  initIdentity();
+  await loadFromCloud();
+  document.getElementById("loading").classList.add("hidden");
+  renderTab();
+}
+
+init();
+</script>
+</body>
+</html>
