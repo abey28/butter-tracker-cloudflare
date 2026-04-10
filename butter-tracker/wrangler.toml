@@ -3,7 +3,7 @@ compatibility_date = "2024-01-01"
 
 [[kv_namespaces]]
 binding = "BUTTER_KV"
-id = "YOUR_KV_NAMESPACE_ID"
+id = "8b5a8ff709a84fa1b2bbe5f49c1647d2"
 preview_id = "YOUR_KV_PREVIEW_ID"
 
 [site]
